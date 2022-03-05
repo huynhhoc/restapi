@@ -1,0 +1,67 @@
+from flask_pymongo import PyMongo
+import flask
+
+app = flask.Flask(__name__)
+
+#mongodb_client = PyMongo(app, uri="mongodb://localhost:27017/todo_db")
+#db = mongodb_client.db
+
+app.config["MONGO_URI"] = "mongodb://localhost:27017/todo_db"
+mongodb_client = PyMongo(app)
+db = mongodb_client.db
+
+@app.route("/add_one")
+def add_one():
+    db.todos.insert_one({'title': "todo title", 'body': "todo body"})
+    return flask.jsonify(message="success")
+
+from pymongo.errors import BulkWriteError
+
+@app.route("/add_many")
+def add_many():
+    try:
+        todo_many = db.todos.insert_many([
+            {'_id': 1, 'title': "todo title one ", 'body': "todo body one "},
+            {'_id': 8, 'title': "todo title two", 'body': "todo body two"},
+            {'_id': 2, 'title': "todo title three", 'body': "todo body three"},
+            {'_id': 9, 'title': "todo title four", 'body': "todo body four"},
+            {'_id': 10, 'title': "todo title five", 'body': "todo body five"},
+            {'_id': 5, 'title': "todo title six", 'body': "todo body six"},
+        ], ordered=False)
+    except BulkWriteError as e:
+        return flask.jsonify(message="duplicates encountered and ignored",
+                             details=e.details,
+                             inserted=e.details['nInserted'],
+                             duplicates=[x['op'] for x in e.details['writeErrors']])
+
+    return flask.jsonify(message="success", insertedIds=todo_many.inserted_ids)
+
+@app.route("/")
+def home():
+    try:
+        todos = db.todos.find().pretty()
+        return flask.jsonify([todo for todo in todos])
+    except:
+        return "home page"
+@app.route("/get_todo/<int:todoId>")
+def insert_one(todoId):
+    todo = db.todos.find_one({"_id": todoId})
+    return todo
+@app.route("/replace_todo/<int:todoId>")
+def replace_one(todoId):
+    result = db.todos.replace_one({'_id': todoId}, {'title': "modified title"})
+    return {'id': result.raw_result}
+
+@app.route("/update_todo/<int:todoId>")
+def update_one(todoId):
+    result = db.todos.update_one({'_id': todoId}, {"$set": {'title': "updated title"}})
+    return result.raw_result
+
+@app.route("/delete_todo/<int:todoId>", methods=['DELETE'])
+def delete_todo(todoId):
+    todo = db.todos.find_one_and_delete({'_id': todoId})
+    if todo is not None:
+        return todo.raw_result
+    return "ID does not exist"
+if __name__ == '__main__':
+    app.run(port=5000, use_reloader=False)
