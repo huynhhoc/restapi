@@ -39,14 +39,18 @@ def add_many():
 @app.route("/")
 def home():
     try:
-        todos = db.todos.find().pretty()
+        todos = db.todos.find({"_id": 1})
         return flask.jsonify([todo for todo in todos])
     except:
         return "home page"
 @app.route("/get_todo/<int:todoId>")
 def insert_one(todoId):
-    todo = db.todos.find_one({"_id": todoId})
-    return todo
+    try:
+        todo = db.todos.find_one({"_id": todoId})
+        return todo
+    except:
+        print("error")
+        return None
 @app.route("/replace_todo/<int:todoId>")
 def replace_one(todoId):
     result = db.todos.replace_one({'_id': todoId}, {'title': "modified title"})
