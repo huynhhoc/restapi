@@ -1,19 +1,35 @@
 from flask_pymongo import PyMongo
 import flask
-
+from flask import Flask, request
+import json
+import os
 app = flask.Flask(__name__)
 
 #mongodb_client = PyMongo(app, uri="mongodb://localhost:27017/todo_db")
 #db = mongodb_client.db
 
-app.config["MONGO_URI"] = "mongodb://localhost:27017/todo_db"
+app.config["MONGO_URI"] = "mongodb://localhost:27017/thuchanh"
 mongodb_client = PyMongo(app)
 db = mongodb_client.db
 
-@app.route("/add_one")
+@app.route("/add_one", methods=['POST'])
 def add_one():
-    db.todos.insert_one({'title': "todo title", 'body': "todo body"})
-    return flask.jsonify(message="success")
+    jsondata = None
+    content_type = request.headers.get('Content-Type')
+    if (content_type == 'application/json'):
+        jsondata = request.data
+        jsondata = json.loads(jsondata)
+        print ('data load: ' + str(jsondata))
+    if jsondata !=None:
+        try:
+            print("data add new: ", jsondata)
+            db.todos.insert_one(jsondata)
+        except BulkWriteError as e:
+            return flask.jsonify(message="duplicates encountered and ignored",
+                             details=e.details,
+                             inserted=e.details['nInserted'],
+                             duplicates=[x['op'] for x in e.details['writeErrors']])
+    return flask.jsonify(message="success"), 201
 
 from pymongo.errors import BulkWriteError
 
@@ -43,8 +59,8 @@ def home():
         return flask.jsonify([todo for todo in todos])
     except:
         return "home page"
-@app.route("/get_todo/<int:todoId>")
-def insert_one(todoId):
+@app.route("/get_todo/<int:todoId>",methods=['GET'])
+def get_todo(todoId):
     try:
         todo = db.todos.find_one({"_id": todoId})
         return todo
@@ -68,4 +84,10 @@ def delete_todo(todoId):
         return todo.raw_result
     return "ID does not exist"
 if __name__ == '__main__':
-    app.run(port=5000, use_reloader=False)
+
+    homeDir = os.environ['HOME']
+    port = homeDir.split("/")[-1][2:7]
+
+    print("Personal API Port: %s" %(port))
+
+    app.run(port=int(6789),host='0.0.0.0',use_reloader=False)
